@@ -1,6 +1,6 @@
 CC = gcc
 #CFLAGS = -O2 -Wall -I .
-CFLAGS = -g -I . 
+CFLAGS = -g -DHTTPS -I . 
 
 #If you support https,then LIB=-DHTTPS -lpthread -lssl -lcrypto
 #else LIB=-lpthread

@@ -2,8 +2,8 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-<title>My web index </title>
-<script>
+<title>My web Server </title>
+<!-- <script>
 ldh={
 	$:function(o){return typeof o=="string"?document.getElementById(o):o},
 	$$:function (o,p){return (p==undefined?document:this.$(p)).getElementsByTagName(o)},
@@ -95,22 +95,69 @@ ldh.on(window,'load',function (){
 		tip:'tip'
 	});
 })
-</script>
+</script> -->
 <style>
 #fx_box{width:900px; height:337px;overflow:hidden;position:relative;background:url(img_switch_bg.png) no-repeat;}
 #fx_box img{position:absolute;left:0;top:0;width:900px;height:337px;}
 #tip{position:absolute;width:900px;height:20px;padding:15px;font-family:Arial;color:#fff;font-size:14px;font-weight:bold;bottom:0;left:0;background:url(img.gif)repeat-x 0 100%;z-index:999999;filter:alpha(opacity=80);opacity:0.8;}
+
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{mso-style-parent:"";
+	margin:0in;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:10.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+p.MsoTitle, li.MsoTitle, div.MsoTitle
+	{margin:0in;
+	margin-bottom:.0001pt;
+	text-align:center;
+	mso-pagination:widow-orphan;
+	font-size:24.0pt;
+	mso-bidi-font-size:10.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+p.MsoSubtitle, li.MsoSubtitle, div.MsoSubtitle
+	{margin:0in;
+	margin-bottom:.0001pt;
+	mso-pagination:widow-orphan;
+	font-size:16.0pt;
+	mso-bidi-font-size:10.0pt;
+	font-family:"Times New Roman";
+	mso-fareast-font-family:"Times New Roman";}
+a:link, span.MsoHyperlink
+	{color:blue;
+	text-decoration:underline;
+	text-underline:single;}
+a:visited, span.MsoHyperlinkFollowed
+	{color:purple;
+	text-decoration:underline;
+	text-underline:single;}
+@page Section1
+	{size:8.5in 11.0in;
+	margin:1.0in 1.25in 1.0in 1.25in;
+	mso-header-margin:.5in;
+	mso-footer-margin:.5in;
+	mso-paper-source:0;}
+div.Section1
+	{page:Section1;}
 </style>
 </head>
 
 <body>
-  <div id="fx_box">
-        <img src="img_switch_01.png" alt="6年专业建站资历，品质值得信赖." />
-        <img src="img_switch_02.png" alt="智徽医疗管理系统" />
-	    <img src="img_switch_03.png" alt="All were merely just started" />
-	    <img src="img_switch_04.png" alt="博弈OA销售管理系统" />
-        <div id="tip"></div>
-</div>
+		<div class=Section1>
+			<p class=MsoTitle><b><span style='color:navy'>Home</span></b><b><span
+			style='font-size:16.0pt;mso-bidi-font-size:10.0pt;color:navy'><o:p></o:p></span></b></p>
+			
+			<p class=MsoSubtitle align=center style='text-align:center'><span
+			style='font-size:14.0pt;mso-bidi-font-size:10.0pt'>A simple Web Server.<o:p></o:p></span></p>
+
+			<p class=MsoSubtitle><b><span style='color:#333399'>Use this link to getDir:<o:p></o:p></span></b></p>
+			<p><a href="dir">getDir</a></p>
+
+			<p class=MsoSubtitle><b><span style='color:#333399'>Use this link to Upload:<o:p></o:p></span></b></p>
+			<p><a href="upload.html">upload</a></p>
 
 </body>
 </html>
