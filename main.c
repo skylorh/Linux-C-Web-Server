@@ -17,13 +17,11 @@ static void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                         char *longmsg);
 
 static void sigChldHandler(int signo);
-/* $begin ssl */
+/*ssl 设置*/
 #ifdef HTTPS
 static void ssl_init(void);
 static void https_getlength(char *buf, int *length);
 #endif
-
-/* $end ssl */
 
 static int isShowdir = 1;
 char *cwd;
@@ -51,7 +49,7 @@ int main(int argc, char **argv) {
   cwd = (char *)get_current_dir_name();
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
-  /* parse argv */
+  /* 解析参数 */
 
 #ifdef HTTPS
   parse_option(argc, argv, &isdaemon, &portp, &logp, &sslportp, &dossl);
@@ -68,12 +66,12 @@ int main(int argc, char **argv) {
 
   Signal(SIGCHLD, sigChldHandler);
 
-  /* init log */
+  /* 日志初始化 */
   if (logp == NULL)
     logp = Getconfig("log");
   initlog(strcat(tmpcwd, logp));
 
-  /* whethe show dir */
+  /* 目录展示判断 */
   if (strcmp(Getconfig("dir"), "no") == 0)
     isShowdir = 0;
 
@@ -84,7 +82,7 @@ int main(int argc, char **argv) {
 
   writePid(1);
 
-/* $https start  */
+/* HTTPS */
 #ifdef HTTPS
   if (dossl) {
     if ((pid = Fork()) == 0) {
@@ -95,7 +93,7 @@ int main(int argc, char **argv) {
         connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
         if (access_ornot(inet_ntoa(clientaddr.sin_addr)) == 0) {
           clienterror(connfd, "maybe this web server not open to you!", "403",
-                      "Forbidden", "Tiny couldn't read the file");
+                      "Forbidden", "Server couldn't read the file");
           continue;
         }
 
@@ -112,14 +110,12 @@ int main(int argc, char **argv) {
   }
 #endif
 
-  /* $end https */
-
   listenfd = Open_listenfd(port);
   while (1) {
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
     if (access_ornot(inet_ntoa(clientaddr.sin_addr)) == 0) {
       clienterror(connfd, "maybe this web server not open to you!", "403",
-                  "Forbidden", "Tiny couldn't read the file");
+                  "Forbidden", "Server couldn't read the file");
       continue;
     }
 
@@ -132,16 +128,14 @@ int main(int argc, char **argv) {
     }
   }
 }
-/* $end main */
 
-/*$sigChldHandler to protect zimble process */
+/* 保护进程 */
 static void sigChldHandler(int signo) {
   Waitpid(-1, NULL, WNOHANG);
   return;
 }
-/*$end sigChldHandler */
 
-/* $begin ssl init  */
+/* ssl 初始化  */
 #ifdef HTTPS
 static void ssl_init(void) {
   static char crypto[] = "RC4-MD5";
@@ -168,12 +162,10 @@ static void ssl_init(void) {
   }
 }
 #endif
-/* $end ssl init */
 
 /*
- * doit - handle one HTTP request/response transaction
+ * 处理一个HTTP请求或响应事务
  */
-/* $begin doit */
 static void doit(int fd) {
   int is_static, contentLength = 0, isGet = 1;
   struct stat sbuf;
@@ -195,7 +187,7 @@ static void doit(int fd) {
   } else
 #endif
   {
-    /* Read request line and headers */
+    /* 读取请求头 */
     Rio_readinitb(&rio, fd);
     Rio_readlineb(&rio, buf, MAXLINE);
   }
@@ -204,16 +196,16 @@ static void doit(int fd) {
 
   if (strcasecmp(method, "GET") != 0 && strcasecmp(method, "POST") != 0) {
     clienterror(fd, method, "501", "Not Implemented",
-                "Tiny does not implement this method");
+                "Server does not implement this method");
     return;
   }
 
-  /* Parse URI from GET request */
+  /* 从GET请求中解析URI */
   is_static = parse_uri(uri, filename, cgiargs);
 
   if (lstat(filename, &sbuf) < 0) {
     clienterror(fd, filename, "404", "Not found",
-                "Tiny couldn't find this file");
+                "Server couldn't find this file");
     return;
   }
 
@@ -223,24 +215,23 @@ static void doit(int fd) {
   if (strcasecmp(method, "POST") == 0)
     isGet = 0;
 
-  if (is_static) { /* Serve static content */
+  if (is_static) { /* 静态内容 */
 
 #ifdef HTTPS
     if (!ishttps)
 #endif
-      get_requesthdrs(
-          &rio); /* because https already read the headers -> SSL_read()  */
+      get_requesthdrs(&rio); /* HTTPS已经通过SSL_read()读取了headers */
 
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
       clienterror(fd, filename, "403", "Forbidden",
-                  "Tiny couldn't read the file");
+                  "Server couldn't read the file");
       return;
     }
     serve_static(fd, filename, sbuf.st_size);
-  } else { /* Serve dynamic content */
+  } else { /* 动态内容 */
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
       clienterror(fd, filename, "403", "Forbidden",
-                  "Tiny couldn't run the CGI program");
+                  "Server couldn't run the CGI program");
       return;
     }
 
@@ -248,9 +239,7 @@ static void doit(int fd) {
 #ifdef HTTPS
       if (!ishttps)
 #endif
-        get_requesthdrs(
-            &rio); /* because https already read headers by SSL_read() */
-
+        get_requesthdrs(&rio); /* HTTPS已经通过SSL_read()读取了headers */
       get_dynamic(fd, filename, cgiargs);
     } else {
 #ifdef HTTPS
@@ -259,14 +248,11 @@ static void doit(int fd) {
       else
 #endif
         post_requesthdrs(&rio, &contentLength);
-
       post_dynamic(fd, filename, contentLength, &rio);
     }
   }
 }
-/* $end doit */
 
-/* $begin https_getlength */
 #ifdef HTTPS
 static void https_getlength(char *buf, int *length) {
   char *p, line[MAXLINE];
@@ -296,34 +282,28 @@ static void https_getlength(char *buf, int *length) {
   return;
 }
 #endif
-/* $end https_getlength  */
 
 /*
- * read_requesthdrs - read and parse HTTP request headers
+ * 读取并解析HTTP请求头
  */
-/* $begin get_requesthdrs */
 static void get_requesthdrs(rio_t *rp) {
   char buf[MAXLINE];
 
   Rio_readlineb(rp, buf, MAXLINE);
-  writetime(); /* write access time in log file */
-  // printf("%s", buf);
+  writetime(); /* 在log文件中记录时间 */
   while (strcmp(buf, "\r\n")) {
     Rio_readlineb(rp, buf, MAXLINE);
     writelog(buf);
-    // printf("%s", buf);
   }
   return;
 }
-/* $end get_requesthdrs */
 
-/* $begin post_requesthdrs */
 static void post_requesthdrs(rio_t *rp, int *length) {
   char buf[MAXLINE];
   char *p;
 
   Rio_readlineb(rp, buf, MAXLINE);
-  writetime(); /* write access time in log file */
+  writetime(); /* 在log文件中记录时间 */
   while (strcmp(buf, "\r\n")) {
     Rio_readlineb(rp, buf, MAXLINE);
     if (strncasecmp(buf, "Content-Length:", 15) == 0) {
@@ -332,13 +312,10 @@ static void post_requesthdrs(rio_t *rp, int *length) {
       *length = atol(p);
     }
     writelog(buf);
-    // printf("%s", buf);
   }
   return;
 }
-/* $end post_requesthdrs */
 
-/* $begin post_dynamic */
 static void serve_dir(int fd, char *filename) {
   DIR *dp;
   struct dirent *dirp;
@@ -350,14 +327,12 @@ static void serve_dir(int fd, char *filename) {
   char *p;
 
   /*
-   * Start get the dir
-   * for example: /home/yihaibo/kerner/web/doc/dir -> dir[]="dir/";
+   * 获取目录
    */
   p = strrchr(filename, '/');
   ++p;
   strcpy(dir, p);
   strcat(dir, "/");
-  /* End get the dir */
 
   if ((dp = opendir(filename)) == NULL)
     syslog(LOG_ERR, "cannot open dir:%s", filename);
@@ -433,9 +408,9 @@ static void serve_dir(int fd, char *filename) {
   closedir(dp);
   sprintf(files, "%s</body></html>", files);
 
-  /* Send response headers to client */
+  /* 向客户端发送响应头 */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, strlen(files));
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, "text/html");
 
@@ -451,9 +426,7 @@ static void serve_dir(int fd, char *filename) {
   }
   exit(0);
 }
-/* $end serve_dir */
 
-/* $begin post_dynamic */
 static void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
   char buf[MAXLINE], length[32], *emptylist[] = {NULL}, data[MAXLINE];
   int p[2];
@@ -472,8 +445,8 @@ static void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
    *    read the post data from the stdin.
    */
 
-  /* https already read all data ,include post data  by SSL_read() */
-  if (Fork() == 0) { /* child  */
+  /* HTTPS已经通过SSL_read()读取了包括post data在内的所有的数据 */
+  if (Fork() == 0) { /* 子进程  */
     Close(p[0]);
 #ifdef HTTPS
     if (ishttps) {
@@ -487,9 +460,9 @@ static void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
     exit(0);
   }
 
-  /* Send response headers to client */
+  /* 向客户端发送响应头 */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
 
 #ifdef HTTPS
   if (ishttps)
@@ -498,53 +471,47 @@ static void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
 #endif
     Rio_writen(fd, buf, strlen(buf));
 
-  // Wait(NULL);
-  Dup2(p[0], STDIN_FILENO); /* Redirct p[0] to stdin */
+  Dup2(p[0], STDIN_FILENO); /* 重定向 p[0] 到 stdin */
   Close(p[0]);
 
   Close(p[1]);
   setenv("CONTENT-LENGTH", length, 1);
 #ifdef HTTPS
-  if (ishttps) /* if ishttps,we couldnot redirct stdout to client,we must use
-                  SSL_write */
+  if (ishttps) /* HTTPS需要使用SSL_write */
   {
     Pipe(httpsp);
 
     if (Fork() == 0) {
-      Dup2(httpsp[1], STDOUT_FILENO); /* Redirct stdout to https[1] */
+      Dup2(httpsp[1], STDOUT_FILENO); /* 重定向 stdout 到 https[1] */
       Execve(filename, emptylist, environ);
     }
-    // Wait(NULL);
     Read(httpsp[0], data, MAXLINE);
     SSL_write(ssl, data, strlen(data));
   } else
 #endif
   {
-    Dup2(fd, STDOUT_FILENO); /* Redirct stdout to client */
+    Dup2(fd, STDOUT_FILENO); /* 重定向 stdout 到 client */
     Execve(filename, emptylist, environ);
   }
 }
-/* $end post_dynamic */
 
 /*
- * parse_uri - parse URI into filename and CGI args
- *             return 0 if dynamic content, 1 if static
+ * 解析URI，如果是cgi调用则返回0，否则返回1。
  */
-/* $begin parse_uri */
 static int parse_uri(char *uri, char *filename, char *cgiargs) {
   char *ptr;
   char tmpcwd[MAXLINE];
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
 
-  if (!strstr(uri, "cgi-bin")) { /* Static content */
+  if (!strstr(uri, "cgi-bin")) {
     strcpy(cgiargs, "");
     strcpy(filename, strcat(tmpcwd, Getconfig("root")));
     strcat(filename, uri);
     if (uri[strlen(uri) - 1] == '/')
       strcat(filename, "home.html");
     return 1;
-  } else { /* Dynamic content */
+  } else {
     ptr = index(uri, '?');
     if (ptr) {
       strcpy(cgiargs, ptr + 1);
@@ -556,24 +523,22 @@ static int parse_uri(char *uri, char *filename, char *cgiargs) {
     return 0;
   }
 }
-/* $end parse_uri */
 
 /*
- * serve_static - copy a file back to the client
+ * 复制一份文件返回给客户端
  */
-/* $begin serve_static */
 static void serve_static(int fd, char *filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
-  /* Send response headers to client */
+  /* 发送响应头给客户端 */
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
 
-  /* Send response body to client */
+  /* 发送响应体给客户端 */
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   Close(srcfd);
@@ -592,7 +557,7 @@ static void serve_static(int fd, char *filename, int filesize) {
 }
 
 /*
- * get_filetype - derive file type from file name
+ * 区分文件类型
  */
 static void get_filetype(const char *filename, char *filetype) {
   if (strstr(filename, ".html"))
@@ -606,18 +571,16 @@ static void get_filetype(const char *filename, char *filetype) {
   else
     strcpy(filetype, "text/plain");
 }
-/* $end serve_static */
 
 /*
- * serve_dynamic - run a CGI program on behalf of the client
+ * 运行cgi程序
  */
-/* $begin get_dynamic */
 void get_dynamic(int fd, char *filename, char *cgiargs) {
   char buf[MAXLINE], *emptylist[] = {NULL}, httpsbuf[MAXLINE];
   int p[2];
-  /* Return first part of HTTP response */
+  /* 返回HTTP响应的第一个部分 */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
 
 #ifdef HTTPS
   if (ishttps)
@@ -629,39 +592,36 @@ void get_dynamic(int fd, char *filename, char *cgiargs) {
 #ifdef HTTPS
   if (ishttps) {
     Pipe(p);
-    if (Fork() == 0) { /* child  */
+    if (Fork() == 0) {
       Close(p[0]);
       setenv("QUERY_STRING", cgiargs, 1);
-      Dup2(p[1], STDOUT_FILENO);            /* Redirect stdout to p[1] */
-      Execve(filename, emptylist, environ); /* Run CGI program */
+      Dup2(p[1], STDOUT_FILENO);            /* 重定向 stdout 到 p[1] */
+      Execve(filename, emptylist, environ); /* 运行cgi程序 */
     }
     Close(p[1]);
-    Read(p[0], httpsbuf, MAXLINE); /* parent read from p[0] */
+    Read(p[0], httpsbuf, MAXLINE); /* 父进程从 p[0] 读 */
     SSL_write(ssl, httpsbuf, strlen(httpsbuf));
   } else
 #endif
   {
-    if (Fork() == 0) { /* child */
-      /* Real server would set all CGI vars here */
+    if (Fork() == 0) {
+      /* 设置cgi参数 */
       setenv("QUERY_STRING", cgiargs, 1);
-      Dup2(fd, STDOUT_FILENO);              /* Redirect stdout to client */
-      Execve(filename, emptylist, environ); /* Run CGI program */
+      Dup2(fd, STDOUT_FILENO);              /* 重定向 stdout 到 client */
+      Execve(filename, emptylist, environ); /* 运行cgi程序 */
     }
   }
-  // Wait(NULL); /* Parent waits for and reaps child */
 }
-/* $end get_dynamic */
 
 /*
- * clienterror - returns an error message to the client
+ * 返回错误信息给客户端
  */
-/* $begin clienterror */
 static void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                         char *longmsg) {
   char buf[MAXLINE], body[MAXBUF];
 
-  /* Build the HTTP response body */
-  sprintf(body, "<html><title>Tiny Error</title>");
+  /* HTTP response body */
+  sprintf(body, "<html><title>Server Error</title>");
   sprintf(body,
           "%s<body bgcolor="
           "ffffff"
@@ -669,9 +629,9 @@ static void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
           body);
   sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
   sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-  sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+  sprintf(body, "%s<hr><em>My Web server</em>\r\n", body);
 
-  /* Print the HTTP response */
+  /* 打印 HTTP response */
   sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
   sprintf(buf, "%sContent-type: text/html\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n\r\n", buf, (int)strlen(body));
@@ -687,11 +647,8 @@ static void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
     Rio_writen(fd, body, strlen(body));
   }
 }
-/* $end clienterror */
 
-/* $begin writePid  */
-/* if the process is running, the interger in the pid file is the pid, else is
- * -1  */
+/* 程序在执行的时候将pid写入文件，否则值为 -1  */
 static void writePid(int option) {
   int pid;
   FILE *fp = Fopen(PID_FILE, "w+");
@@ -702,4 +659,3 @@ static void writePid(int option) {
   fprintf(fp, "%d", pid);
   Fclose(fp);
 }
-/* $end writePid  */

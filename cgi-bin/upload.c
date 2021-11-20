@@ -4,9 +4,7 @@
 
 #define MAXLEN 10000
 #define EXTRA 0
-/* 4 for field name "data", 1 for "=" */
 #define MAXINPUT MAXLEN + EXTRA + 2
-/* 1 for added line break, 1 for trailing NUL */
 
 void unencode(char *src, char *last, char *dest) {
   for (; src != last; src++, dest++)

@@ -7,9 +7,9 @@ CFLAGS = -g -DHTTPS -I .
 LIB = -DHTTPS -lpthread -lssl -lcrypto 
 #LIB = -lpthread 
 
-all: webd 
+all: chttpserver 
 
-webd: main.c wrap.o parse_config.o daemon_init.o parse_option.o log.o secure_access.o cgi
+chttpserver: main.c wrap.o parse_config.o daemon_init.o parse_option.o log.o secure_access.o cgi
 	$(CC) $(CFLAGS) -o $@  main.c wrap.o parse_config.o daemon_init.o parse_option.o log.o secure_access.o $(LIB) 
 
 wrap.o: wrap.c

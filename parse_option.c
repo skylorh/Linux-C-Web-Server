@@ -1,12 +1,5 @@
 #include "parse.h"
 
-/* parse the command option
--d(--daemon)   daemon process
--p(--port)     assign http port
--s(--port)     assign https port
--l(--log)      log path
-*/
-
 static void usage(void) {
   fprintf(stderr, "usage:./main [-d --daemon] [-p --port] [-s --sslport] [-l "
                   "--log] [-v --version] [-h --help]\n\n");
@@ -18,12 +11,11 @@ static void version(void) {
                   "提供GET,POST功能\n"
                   "实现SSL安全连接\n"
                   "提供目录访问和简单的访问控制\n\n"
-                  "作者:...\n\n"
+                  "计算机网络大作业\n\n"
                   "SSL实现:基于OPENSSL库\n\n");
   exit(1);
 }
 
-/* $start parse_option  */
 #ifdef HTTPS
 void parse_option(int argc, char **argv, char *d, char **portp, char **logp,
                   char **sslp, char *dossl)
@@ -39,16 +31,12 @@ void parse_option(int argc, char **argv, char *d, char **portp, char **logp)
   static char log[64];
 
   struct option longopts[] = {
-      {"daemon", 0, NULL, 'd'}, /* 0->hasn't arg   1-> has arg */
-      {"port", 1, NULL, 'p'},
+      {"daemon", 0, NULL, 'd'},  {"port", 1, NULL, 'p'},
 #ifdef HTTPS
-      {"sslport", 1, NULL, 's'},
-      {"extent", 0, NULL, 'e'}, /* extent function -> https */
+      {"sslport", 1, NULL, 's'}, {"extent", 0, NULL, 'e'},
 #endif
-      {"log", 1, NULL, 'l'},
-      {"help", 0, NULL, 'h'},
-      {"version", 0, NULL, 'v'},
-      {0, 0, 0, 0}}; /* the last must be a zero array */
+      {"log", 1, NULL, 'l'},     {"help", 0, NULL, 'h'},
+      {"version", 0, NULL, 'v'}, {0, 0, 0, 0}};
 
 #ifdef HTTPS
   while ((opt = getopt_long(argc, argv, ":dp:s:l:ehv", longopts, NULL)) != -1)
@@ -94,9 +82,8 @@ void parse_option(int argc, char **argv, char *d, char **portp, char **logp)
     }
   }
 }
-/* $end parse_option  */
 
-/* parse_option test
+/* parse_option 测试
 int main(int argc,char **argv)
 {
 

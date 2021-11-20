@@ -26,16 +26,14 @@ int main(int argc, char **argv) {
   cwd = (char *)get_current_dir_name();
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
-  /* parse argv */
+
   parse_option(argc, argv, &daemon, &portp, &logp);
   portp == NULL ? (port = atoi(getconfig("port"))) : (port = atoi(portp));
 
-  /* init log */
   if (logp == NULL)
     logp = getconfig("log");
   initlog(strcat(tmpcwd, logp));
 
-  /* where show dir */
   if (strcmp(getconfig("dir"), "no") == 0)
     isShowdir = 0;
 
@@ -49,7 +47,7 @@ int main(int argc, char **argv) {
     connfd = Accept(listenfd, (SA *)&clientaddr, &clientlen);
     if (access_ornot(inet_ntoa(clientaddr.sin_addr)) == 0) {
       clienterror(connfd, "maybe this web server not open to you!", "403",
-                  "Forbidden", "Tiny couldn't read the file");
+                  "Forbidden", "Server couldn't read the file");
       continue;
     }
 
@@ -61,12 +59,7 @@ int main(int argc, char **argv) {
     }
   }
 }
-/* $end main */
 
-/*
- * doit - handle one HTTP request/response transaction
- */
-/* $begin doit */
 void doit(int fd) {
   int is_static, contentLength = 0, isGet = 1;
   struct stat sbuf;
@@ -74,7 +67,6 @@ void doit(int fd) {
   char filename[MAXLINE], cgiargs[MAXLINE];
   rio_t rio;
 
-  /* Read request line and headers */
   Rio_readinitb(&rio, fd);
   Rio_readlineb(&rio, buf, MAXLINE);
   sscanf(buf, "%s %s %s", method, uri, version);
@@ -90,17 +82,16 @@ void doit(int fd) {
 
   if (strcasecmp(method, "GET") != 0 && strcasecmp(method, "POST") != 0) {
     clienterror(fd, method, "501", "Not Implemented",
-                "Tiny does not implement this method");
+                "Server does not implement this method");
     return;
   }
 
-  /* Parse URI from GET request */
   is_static = parse_uri(uri, filename, cgiargs);
   printf("filename: %s", filename);
 
   if (lstat(filename, &sbuf) < 0) {
     clienterror(fd, filename, "404", "Not found",
-                "Tiny couldn't find this file");
+                "Server couldn't find this file");
     return;
   }
 
@@ -110,19 +101,19 @@ void doit(int fd) {
   if (strcasecmp(method, "POST") == 0)
     isGet = 0;
 
-  if (is_static) { /* Serve static content */
+  if (is_static) {
     get_requesthdrs(&rio);
 
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IRUSR & sbuf.st_mode)) {
       clienterror(fd, filename, "403", "Forbidden",
-                  "Tiny couldn't read the file");
+                  "Server couldn't read the file");
       return;
     }
     serve_static(fd, filename, sbuf.st_size);
-  } else { /* Serve dynamic content */
+  } else {
     if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
       clienterror(fd, filename, "403", "Forbidden",
-                  "Tiny couldn't run the CGI program");
+                  "Server couldn't run the CGI program");
       return;
     }
 
@@ -137,17 +128,12 @@ void doit(int fd) {
     }
   }
 }
-/* $end doit */
 
-/*
- * read_requesthdrs - read and parse HTTP request headers
- */
-/* $begin get_requesthdrs */
 void get_requesthdrs(rio_t *rp) {
   char buf[MAXLINE];
 
   Rio_readlineb(rp, buf, MAXLINE);
-  writetime(); // write access time in log file
+  writetime();
   printf("%s", buf);
   while (strcmp(buf, "\r\n")) {
     Rio_readlineb(rp, buf, MAXLINE);
@@ -156,15 +142,13 @@ void get_requesthdrs(rio_t *rp) {
   }
   return;
 }
-/* $end get_requesthdrs */
 
-/* $begin post_requesthdrs */
 void post_requesthdrs(rio_t *rp, int *length) {
   char buf[MAXLINE];
   char *p;
 
   Rio_readlineb(rp, buf, MAXLINE);
-  writetime(); // write access time in log file
+  writetime();
   printf("%s", buf);
   while (strcmp(buf, "\r\n")) {
     Rio_readlineb(rp, buf, MAXLINE);
@@ -178,9 +162,7 @@ void post_requesthdrs(rio_t *rp, int *length) {
   }
   return;
 }
-/* $end post_requesthdrs */
 
-/* $begin post_dynamic */
 void serve_dir(int fd, char *filename) {
   DIR *dp;
   struct dirent *dirp;
@@ -242,20 +224,16 @@ void serve_dir(int fd, char *filename) {
   sprintf(files, "%s</body></html>", files);
   printf("%s\n", files);
 
-  /* Send response headers to client */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, strlen(files));
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, "text/html");
   Rio_writen(fd, buf, strlen(buf));
 
-  /* Send data to client */
   Rio_writen(fd, files, strlen(files));
   exit(0);
 }
-/* $end serve_dir */
 
-/* $begin post_dynamic */
 void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
   char buf[MAXLINE], length[32], *emptylist[] = {NULL}, data[MAXLINE];
   int p[2];
@@ -265,53 +243,41 @@ void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
   if (pipe(p) == -1)
     syslog(LOG_ERR, "cannot create pipe");
 
-  /*       The post data is sended by client,we need to redirct the data to cgi
-   * stdin. so, child read contentLength bytes data from fp,and write to p[1];
-   *    parent should redirct p[0] to stdin. As a result, the cgi script can
-   *    read the post data from the stdin.
-   */
-  if (Fork() == 0) { /* child  */
+  if (Fork() == 0) {
     close(p[0]);
     Rio_readnb(rp, data, contentLength);
     Rio_writen(p[1], data, contentLength);
     exit(0);
   }
 
-  /* Send response headers to client */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Server: Tiny Web Server\r\n");
+  sprintf(buf, "Server: My Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
 
-  Dup2(p[0], STDIN_FILENO); /* Redirct p[0] to stdin */
+  Dup2(p[0], STDIN_FILENO);
   close(p[0]);
 
   close(p[1]);
   setenv("CONTENT-LENGTH", length, 1);
-  Dup2(fd, STDOUT_FILENO); /* Redirct stdout to client */
+  Dup2(fd, STDOUT_FILENO);
   Execve(filename, emptylist, environ);
 }
-/* $end post_dynamic */
 
-/*
- * parse_uri - parse URI into filename and CGI args
- *             return 0 if dynamic content, 1 if static
- */
-/* $begin parse_uri */
 int parse_uri(char *uri, char *filename, char *cgiargs) {
   char *ptr;
   char tmpcwd[MAXLINE];
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
 
-  if (!strstr(uri, "cgi-bin")) { /* Static content */
+  if (!strstr(uri, "cgi-bin")) {
     strcpy(cgiargs, "");
     strcpy(filename, strcat(tmpcwd, getconfig("root")));
     strcat(filename, uri);
     if (uri[strlen(uri) - 1] == '/')
       strcat(filename, "home.html");
     return 1;
-  } else { /* Dynamic content */
+  } else {
     ptr = index(uri, '?');
     if (ptr) {
       strcpy(cgiargs, ptr + 1);
@@ -323,25 +289,18 @@ int parse_uri(char *uri, char *filename, char *cgiargs) {
     return 0;
   }
 }
-/* $end parse_uri */
 
-/*
- * serve_static - copy a file back to the client
- */
-/* $begin serve_static */
 void serve_static(int fd, char *filename, int filesize) {
   int srcfd;
   char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
-  /* Send response headers to client */
   get_filetype(filename, filetype);
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
-  sprintf(buf, "%sServer: Tiny Web Server\r\n", buf);
+  sprintf(buf, "%sServer: My Web Server\r\n", buf);
   sprintf(buf, "%sContent-length: %d\r\n", buf, filesize);
   sprintf(buf, "%sContent-type: %s\r\n\r\n", buf, filetype);
   Rio_writen(fd, buf, strlen(buf));
 
-  /* Send response body to client */
   srcfd = Open(filename, O_RDONLY, 0);
   srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
   Close(srcfd);
@@ -349,9 +308,6 @@ void serve_static(int fd, char *filename, int filesize) {
   Munmap(srcp, filesize);
 }
 
-/*
- * get_filetype - derive file type from file name
- */
 void get_filetype(char *filename, char *filetype) {
   if (strstr(filename, ".html"))
     strcpy(filetype, "text/html");
@@ -364,41 +320,28 @@ void get_filetype(char *filename, char *filetype) {
   else
     strcpy(filetype, "text/plain");
 }
-/* $end serve_static */
 
-/*
- * serve_dynamic - run a CGI program on behalf of the client
- */
-/* $begin get_dynamic */
 void get_dynamic(int fd, char *filename, char *cgiargs) {
   char buf[MAXLINE], *emptylist[] = {NULL};
 
-  /* Return first part of HTTP response */
   sprintf(buf, "HTTP/1.0 200 OK\r\n");
   Rio_writen(fd, buf, strlen(buf));
-  sprintf(buf, "Server: Tiny Web Server\r\n");
+  sprintf(buf, "Server: My Web Server\r\n");
   Rio_writen(fd, buf, strlen(buf));
 
-  if (Fork() == 0) { /* child */
-    /* Real server would set all CGI vars here */
+  if (Fork() == 0) {
     setenv("QUERY_STRING", cgiargs, 1);
-    Dup2(fd, STDOUT_FILENO);              /* Redirect stdout to client */
-    Execve(filename, emptylist, environ); /* Run CGI program */
+    Dup2(fd, STDOUT_FILENO);
+    Execve(filename, emptylist, environ);
   }
-  Wait(NULL); /* Parent waits for and reaps child */
+  Wait(NULL);
 }
-/* $end get_dynamic */
 
-/*
- * clienterror - returns an error message to the client
- */
-/* $begin clienterror */
 void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
                  char *longmsg) {
   char buf[MAXLINE], body[MAXBUF];
 
-  /* Build the HTTP response body */
-  sprintf(body, "<html><title>Tiny Error</title>");
+  sprintf(body, "<html><title>Server Error</title>");
   sprintf(body,
           "%s<body bgcolor="
           "ffffff"
@@ -406,9 +349,8 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
           body);
   sprintf(body, "%s%s: %s\r\n", body, errnum, shortmsg);
   sprintf(body, "%s<p>%s: %s\r\n", body, longmsg, cause);
-  sprintf(body, "%s<hr><em>The Tiny Web server</em>\r\n", body);
+  sprintf(body, "%s<hr><em>My Web server</em>\r\n", body);
 
-  /* Print the HTTP response */
   sprintf(buf, "HTTP/1.0 %s %s\r\n", errnum, shortmsg);
   Rio_writen(fd, buf, strlen(buf));
   sprintf(buf, "Content-type: text/html\r\n");
@@ -417,4 +359,3 @@ void clienterror(int fd, char *cause, char *errnum, char *shortmsg,
   Rio_writen(fd, buf, strlen(buf));
   Rio_writen(fd, body, strlen(body));
 }
-/* $end clienterror */
