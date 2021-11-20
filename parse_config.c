@@ -10,8 +10,6 @@ static FILE *getfp(char *path) {
 
 static char *getconfig(char *name) {
   /*
-  pointer meaning:
-
   ...port...=...8000...
      |  |   |   |  |
     *fs |   |   |  *be    f->forward  b-> back
