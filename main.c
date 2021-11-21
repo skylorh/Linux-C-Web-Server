@@ -46,7 +46,7 @@ int main(int argc, char **argv) {
 #endif
 
   openlog(argv[0], LOG_NDELAY | LOG_PID, LOG_DAEMON);
-  cwd = (char *)get_current_dir_name();
+  cwd = (char *)get_current_dir_name();  /* 获取启动程序的目录 */
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
   /* 解析参数 */
@@ -472,7 +472,7 @@ static void post_dynamic(int fd, char *filename, int contentLength, rio_t *rp) {
     Rio_writen(fd, buf, strlen(buf));
 
   Dup2(p[0], STDIN_FILENO); /* 重定向 p[0] 到 stdin */
-  Close(p[0]);
+  Close(p[0]);              /* 现在，只能从标准输入得到管道的内容 */
 
   Close(p[1]);
   setenv("CONTENT-LENGTH", length, 1);
@@ -504,7 +504,7 @@ static int parse_uri(char *uri, char *filename, char *cgiargs) {
   strcpy(tmpcwd, cwd);
   strcat(tmpcwd, "/");
 
-  if (!strstr(uri, "cgi-bin")) {
+  if (!strstr(uri, "cgi-bin")) {   /* url中不包含'cgi-bin'子串，则为静态请求 */
     strcpy(cgiargs, "");
     strcpy(filename, strcat(tmpcwd, Getconfig("root")));
     strcat(filename, uri);
@@ -553,7 +553,7 @@ static void serve_static(int fd, char *filename, int filesize) {
     Rio_writen(fd, buf, strlen(buf));
     Rio_writen(fd, srcp, filesize);
   }
-  Munmap(srcp, filesize);
+  Munmap(srcp, filesize); /* 取消内存映射地址 */
 }
 
 /*
@@ -594,7 +594,7 @@ void get_dynamic(int fd, char *filename, char *cgiargs) {
     Pipe(p);
     if (Fork() == 0) {
       Close(p[0]);
-      setenv("QUERY_STRING", cgiargs, 1);
+      setenv("QUERY_STRING", cgiargs, 1);   /* 设置环境变量，用于向子进程传递参数 */
       Dup2(p[1], STDOUT_FILENO);            /* 重定向 stdout 到 p[1] */
       Execve(filename, emptylist, environ); /* 运行cgi程序 */
     }
@@ -611,6 +611,65 @@ void get_dynamic(int fd, char *filename, char *cgiargs) {
       Execve(filename, emptylist, environ); /* 运行cgi程序 */
     }
   }
+}
+
+/* 
+ * 分块传输编码
+ */
+int trans_chunked(const char* filename, const char* temp_chunked)
+{
+	int file_size, temp_size;
+	struct stat tbuf1, tbuf2;
+	int chunked_size = 8; 
+	FILE* pfr = fopen(filename, "r");
+	FILE* pfw = fopen(temp_chunked, "w");
+	printf("file:%s\n", filename);
+	printf("temp:%s\n", temp_chunked);
+	if (NULL == pfw)
+	{
+		perror("open temp file");
+		return -1;
+	}
+	if (NULL == pfr)
+	{
+		perror("open source file");
+		return -1;
+	}
+
+	stat(filename, &tbuf1);
+	file_size = tbuf1.st_size;
+	temp_size = file_size;
+	/* 文件分块 */
+	while(temp_size){
+		if(temp_size>chunked_size){			
+			fprintf(pfw, "%d\r\n", chunked_size);
+			for(int i=0; i<chunked_size; i++){
+				fputc(fgetc(pfr), pfw);
+			}
+			fprintf(pfw, "\r\n");
+			temp_size -= chunked_size;
+		}
+		else{
+			fprintf(pfw, "%d\r\n", temp_size);
+			for(int i=0; i<temp_size; i++){
+				fputc(fgetc(pfr), pfw);
+			}
+			fprintf(pfw, "\r\n");
+			temp_size = 0;
+		}
+	}
+  /* 最后以0\r\n\r\n结束 */
+	fprintf(pfw, "%d\r\n", 0);		
+	fprintf(pfw, "\r\n");
+
+	stat(filename, &tbuf2);
+	temp_size = tbuf2.st_size;
+  /* 关闭流，避免占用资源 */
+	fclose(pfr);
+	fclose(pfw);
+	pfr = NULL;
+	pfw = NULL;
+	return temp_size;
 }
 
 /*
